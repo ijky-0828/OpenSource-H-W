@@ -1,8 +1,10 @@
 #include <DHT11.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h> // I2C LCD 라이브러리 포함
+#include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>
+//라이브러리 포함
 
-// DHT11 센서 객체 생성 및 핀 번호 설정
+// DHT11 센서 핀 번호 설정
 DHT11 dht11(8);
 
 // RGB LED 핀 번호 설정
@@ -18,12 +20,20 @@ const int fanINBPin = 6;
 const int buttonPin = 2;
 bool isButtonPressed = false; // 버튼 상태를 저장하는 변수
 
-// I2C 주소와 함께 LCD 객체 생성 (기본 주소는 0x27)
+// 블루투스 모듈 핀 번호 설정
+const int bluetoothRxPin = 4;
+const int bluetoothTxPin = 3;
+
+
+SoftwareSerial bluetooth(bluetoothRxPin, bluetoothTxPin);
+
+// I2C 주소 지정
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
-    // 시리얼 통신 시작
+
     Serial.begin(9600);
+    bluetooth.begin(9600);
 
     // RGB LED 핀을 출력 모드로 설정
     pinMode(redPin, OUTPUT);
@@ -42,7 +52,7 @@ void setup() {
     lcd.backlight();
     lcd.print("Initializing...");
 
-    // 초기화 메시지
+    // 초기화 메시지 출력
     Serial.println("System Initialized");
 }
 
@@ -50,8 +60,8 @@ void loop() {
     // 버튼 상태 확인 및 토글
     checkButton();
 
-    // 시리얼 입력 확인 및 팬 제어
-    checkSerialInput();
+    // 블루투스 입력 확인 및 팬 제어
+    checkBluetoothInput();
 
     if (isButtonPressed) {
         int temperature = 0;
@@ -60,39 +70,39 @@ void loop() {
         // DHT11 센서로부터 온도와 습도 값을 읽음
         int result = dht11.readTemperatureHumidity(temperature, humidity);
 
-        // 읽기 성공 시 온도 값을 시리얼 모니터와 LCD에 출력
+        // 온도 값을 시리얼 모니터와 LCD에 출력
         if (result == 0) {
             Serial.print("Temperature: ");
             Serial.print(temperature);
             Serial.print(" °C\t");
 
             lcd.clear();
-            lcd.setCursor(0, 0); // 첫 번째 줄 첫 번째 칸으로 커서 이동
+            lcd.setCursor(0, 0); // 첫 번째 줄 첫 번째 칸으로 커서 지정
             lcd.print("Temp: ");
             lcd.print(temperature);
             lcd.print(" C");
 
-            // 온도에 따른 RGB LED 색상 및 팬 속도 설정
+            // 온도에 따른 RGB LED 색깔 및 팬 속도 설정
             if (temperature <= 22) {
                 // 파란색 출력 및 팬 정지
                 setColor(0, 0, 255);
                 setFanSpeed(0); // 팬 정지
                 Serial.println("Fan OFF");
-                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 이동
+                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 지정
                 lcd.print("Fan: OFF");
             } else if (temperature <= 27) {
                 // 노란색 출력 및 팬 느리게 회전
                 setColor(255, 255, 0);
                 setFanSpeed(128); // 팬 느리게 회전 (50% 속도)
                 Serial.println("Fan LOW");
-                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 이동
+                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 지정
                 lcd.print("Fan: LOW");
             } else {
                 // 빨간색 출력 및 팬 빠르게 회전
                 setColor(255, 0, 0);
                 setFanSpeed(255); // 팬 빠르게 회전 (100% 속도)
                 Serial.println("Fan HIGH");
-                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 이동
+                lcd.setCursor(0, 1); // 두 번째 줄 첫 번째 칸으로 커서 지정
                 lcd.print("Fan: HIGH");
             }
         } else {
@@ -121,7 +131,7 @@ void loop() {
 // 버튼 상태 확인 함수
 void checkButton() {
     if (digitalRead(buttonPin) == LOW) {
-        delay(50); // 디바운싱을 위해 약간의 지연
+        delay(50); // 안정적인 작동을 위해 약간의 지연시간 추가
         if (digitalRead(buttonPin) == LOW) {
             isButtonPressed = !isButtonPressed; // 버튼 상태 토글
             while (digitalRead(buttonPin) == LOW); // 버튼이 눌린 동안 대기
@@ -129,16 +139,16 @@ void checkButton() {
     }
 }
 
-// 시리얼 입력 확인 및 팬 제어 함수
-void checkSerialInput() {
-    if (Serial.available() > 0) {
-        char input = Serial.read();
+// 블루투스 입력 확인 및 팬 제어 함수
+void checkBluetoothInput() {
+    if (bluetooth.available() > 0) {
+        char input = bluetooth.read();
         Serial.print("Received input: "); // 입력값 디버깅 메시지
         Serial.println(input);
 
         if (input == '1') {
             setFanSpeed(128); // 팬 느리게 회전 (50% 속도)
-            Serial.println("Fan LOW");
+            Serial.println("Fan LOW (50%)");
         } else if (input == '2') {
             setFanSpeed(0); // 팬 정지
             Serial.println("Fan OFF");
